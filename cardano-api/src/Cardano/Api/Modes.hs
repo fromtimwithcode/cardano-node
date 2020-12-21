@@ -21,9 +21,11 @@ module Cardano.Api.Modes (
     eraInModeToEra,
     anyEraInModeToAnyEra,
     AnyEraInMode(..),
+    toEraInMode,
 
     -- * Connection paramaters for each mode
     ConsensusModeParams(..),
+    AnyConsensusModeParams(..),
     Byron.EpochSlots,
 
     -- * Conversions to and from types in the consensus library
@@ -35,20 +37,20 @@ module Cardano.Api.Modes (
 
 import           Prelude
 
-import           Data.SOP.Strict (NS(Z, S), K(K))
+import           Data.SOP.Strict (K (K), NS (S, Z))
+import           Data.Type.Equality ((:~:) (Refl), TestEquality (..))
 
-import           Ouroboros.Consensus.Shelley.Protocol (StandardCrypto)
-import           Ouroboros.Consensus.Shelley.Eras
-                   (StandardShelley, StandardAllegra, StandardMary)
-import qualified Ouroboros.Consensus.Cardano.Block      as Consensus
-import           Ouroboros.Consensus.HardFork.Combinator as Consensus
-                   (EraIndex(..), eraIndexZero, eraIndexSucc)
 import qualified Ouroboros.Consensus.Byron.Ledger as Consensus
-import qualified Ouroboros.Consensus.Shelley.Ledger as Consensus
-import qualified Ouroboros.Consensus.Cardano.ByronHFC   as Consensus (ByronBlockHFC)
+import qualified Ouroboros.Consensus.Cardano.Block as Consensus
+import qualified Ouroboros.Consensus.Cardano.ByronHFC as Consensus (ByronBlockHFC)
 import qualified Ouroboros.Consensus.Cardano.ShelleyHFC as Consensus (ShelleyBlockHFC)
+import           Ouroboros.Consensus.HardFork.Combinator as Consensus (EraIndex (..), eraIndexSucc,
+                     eraIndexZero)
+import           Ouroboros.Consensus.Shelley.Eras (StandardAllegra, StandardMary, StandardShelley)
+import qualified Ouroboros.Consensus.Shelley.Ledger as Consensus
+import           Ouroboros.Consensus.Shelley.Protocol (StandardCrypto)
 
-import qualified Cardano.Chain.Slotting as Byron (EpochSlots(..))
+import qualified Cardano.Chain.Slotting as Byron (EpochSlots (..))
 
 import           Cardano.Api.Eras
 
@@ -84,6 +86,17 @@ data ShelleyMode
 --
 data CardanoMode
 
+data AnyConsensusModeParams where
+  AnyConsensusModeParams :: ConsensusModeParams mode -> AnyConsensusModeParams
+
+deriving instance Show AnyConsensusModeParams
+
+instance Eq AnyConsensusModeParams where
+  AnyConsensusModeParams cMp1 == AnyConsensusModeParams cMp2 =
+    case testEquality cMp1 cMp2 of
+      Nothing -> False
+      Just Refl -> True
+
 -- | This GADT provides a value-level representation of all the consensus modes.
 -- This enables pattern matching on the era to allow them to be treated in a
 -- non-uniform way.
@@ -102,6 +115,14 @@ data ConsensusModeIsMultiEra mode where
      CardanoModeIsMultiEra :: ConsensusModeIsMultiEra CardanoMode
 
 deriving instance Show (ConsensusModeIsMultiEra mode)
+
+toEraInMode :: ConsensusModeParams mode -> CardanoEra era -> EraInMode era mode
+toEraInMode (ByronModeParams _)   ByronEra   = ByronEraInByronMode
+toEraInMode (ShelleyModeParams)   ShelleyEra = ShelleyEraInShelleyMode
+toEraInMode (CardanoModeParams _) ByronEra   = ByronEraInCardanoMode
+toEraInMode (CardanoModeParams _) ShelleyEra = ShelleyEraInCardanoMode
+toEraInMode (CardanoModeParams _) AllegraEra = AllegraEraInCardanoMode
+toEraInMode (CardanoModeParams _) MaryEra    = MaryEraInCardanoMode
 
 
 -- | A representation of which 'CardanoEra's are included in each
@@ -170,6 +191,13 @@ data ConsensusModeParams mode where
      CardanoModeParams
        :: Byron.EpochSlots
        -> ConsensusModeParams CardanoMode
+
+deriving instance Show (ConsensusModeParams mode)
+
+instance TestEquality ConsensusModeParams where
+  testEquality (ByronModeParams _) (ByronModeParams _) = Just Refl
+  testEquality (ShelleyModeParams) (ShelleyModeParams) = Just Refl
+  testEquality (CardanoModeParams _) (CardanoModeParams _) = Just Refl
 
 
 -- ----------------------------------------------------------------------------

@@ -17,6 +17,7 @@ import           Cardano.Prelude hiding (All, Any, option)
 import           Prelude (String)
 
 import           Cardano.Api
+import           Cardano.Api.Modes
 import           Cardano.Api.Protocol (Protocol (..))
 import           Cardano.Api.Shelley
 
@@ -527,7 +528,7 @@ pTransaction =
                                     <*> pOutputFile
 
   pTransactionSubmit :: Parser TransactionCmd
-  pTransactionSubmit = TxSubmit <$> pProtocol
+  pTransactionSubmit = TxSubmit <$> pConsensusModeParams
                                 <*> pNetworkId
                                 <*> pTxSubmitFile
 
@@ -2271,6 +2272,10 @@ pExtraEntropy =
     parseEntropyBytes = either fail return
                       . B16.decode
                     =<< Atto.takeWhile1 Char.isHexDigit
+
+
+pConsensusModeParams :: Parser AnyConsensusModeParams
+pConsensusModeParams = panic ""
 
 pProtocol :: Parser Protocol
 pProtocol =
